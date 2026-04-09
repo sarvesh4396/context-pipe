@@ -1,16 +1,33 @@
 [project]
 name = "context-pipe"
 version = "0.1.0"
-description = "Add your description here"
+description = "Extensible conversation context management toolkit for LLM applications"
 readme = "README.md"
+license = { text = "MIT" }
 authors = [
-    { name = "sarvesh4396", email = "heysarvesh@pm.me" }
+    { name = "Sarvesh Kr. Dwivedi", email = "heysarvesh@pm.me" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.11"
 dependencies = []
 
+[project.optional-dependencies]
+memory = ["context-pipe-memory==0.1.0"]
+redis = ["context-pipe-redis==0.1.0"]
+sqlalchemy = ["context-pipe-sqlalchemy==0.1.0"]
+all = [
+    "context-pipe-memory==0.1.0",
+    "context-pipe-redis==0.1.0",
+    "context-pipe-sqlalchemy==0.1.0",
+]
+
 [tool.uv.workspace]
-members = ["packages/*"]
+members = [".", "packages/*"]
+
+[tool.uv.sources]
+context-pipe = { workspace = true }
+context-pipe-memory = { workspace = true }
+context-pipe-redis = { workspace = true }
+context-pipe-sqlalchemy = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.11.3,<0.12.0"]
@@ -27,3 +44,17 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.15.9",
 ]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

@@ -1,12 +1,13 @@
 [project]
 name = "context-pipe-redis"
 version = "0.1.0"
-description = "Add your description here"
+description = "Redis backend for context-pipe"
 authors = [
-    { name = "sarvesh4396", email = "heysarvesh@pm.me" }
+    { name = "Sarvesh Kr. Dwivedi", email = "heysarvesh@pm.me" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.11"
 dependencies = [
+    "context-pipe==0.1.0",
     "redis[asyncio]>=7.4.0",
 ]
 

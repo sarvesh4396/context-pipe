@@ -1,12 +1,13 @@
 [project]
 name = "context-pipe-sqlalchemy"
 version = "0.1.0"
-description = "Add your description here"
+description = "SQLAlchemy backend for context-pipe"
 authors = [
-    { name = "sarvesh4396", email = "heysarvesh@pm.me" }
+    { name = "Sarvesh Kr. Dwivedi", email = "heysarvesh@pm.me" }
 ]
-requires-python = ">=3.14"
+requires-python = ">=3.11"
 dependencies = [
+    "context-pipe==0.1.0",
     "aiosqlite>=0.22.1",
     "sqlalchemy[asyncio]>=2.0.49",
 ]
