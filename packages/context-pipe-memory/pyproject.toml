@@ -1,0 +1,13 @@
+[project]
+name = "context-pipe-memory"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "sarvesh4396", email = "heysarvesh@pm.me" }
+]
+requires-python = ">=3.14"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.11.3,<0.12.0"]
+build-backend = "uv_build"
