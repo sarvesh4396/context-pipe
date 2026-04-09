@@ -21,8 +21,8 @@ _async_lock = asyncio.Lock()
 
 
 class MemoryBackend(AbstractBackend):
-    def __init__(self) -> None:
-        pass
+    def __init__(self, conversation_id: int | None = None) -> None:
+        super().__init__(conversation_id)
 
     def create(self) -> Conversation:
         global CONVERSATION_COUNTER
@@ -44,27 +44,50 @@ class MemoryBackend(AbstractBackend):
             CONVERSATIONS[conversation.id] = conversation
         return conversation
 
-    def load(self, conversation_id: int) -> Conversation:
+    def load(self, conversation_id: int | None = None) -> Conversation:
+        conversation_id = conversation_id or self.conversation_id
+        if conversation_id is None:
+            raise ValueError("conversation_id must be provided or set in __init__")
         with _lock:
             if conversation_id not in CONVERSATIONS:
                 raise KeyError(f"Conversation '{conversation_id}' not found")
             return CONVERSATIONS[conversation_id]
 
-    def delete(self, conversation_id: int) -> None:
+    def delete(self, conversation_id: int | None = None) -> None:
+        conversation_id = conversation_id or self.conversation_id
+        if conversation_id is None:
+            raise ValueError("conversation_id must be provided or set in __init__")
         with _lock:
             if conversation_id in CONVERSATIONS:
                 del CONVERSATIONS[conversation_id]
 
-    def exists(self, conversation_id: int) -> bool:
+    def exists(self, conversation_id: int | None = None) -> bool:
+        conversation_id = conversation_id or self.conversation_id
+        if conversation_id is None:
+            raise ValueError("conversation_id must be provided or set in __init__")
         with _lock:
             return conversation_id in CONVERSATIONS
 
-    def update_token_counts(self, conversation_id: int) -> None:
-        """Not required here"""
-        pass
+    def update_token_counts(self, conversation_id: int | None = None) -> None:
+        conversation_id = conversation_id or self.conversation_id
+        if conversation_id is None:
+            raise ValueError("conversation_id must be provided or set in __init__")
+        with _lock:
+            if conversation_id not in CONVERSATIONS:
+                raise KeyError(f"Conversation '{conversation_id}' not found")
 
-    def add_message(self, message: Message, conversation_id: int) -> Message:
+            conv = CONVERSATIONS[conversation_id]
+            for msg in conv.messages:
+                if msg.token_count is None:
+                    msg.token_count = 0
+
+    def add_message(
+        self, message: Message, conversation_id: int | None = None
+    ) -> Message:
         global MESSAGE_COUNTER
+        conversation_id = conversation_id or self.conversation_id
+        if conversation_id is None:
+            raise ValueError("conversation_id must be provided or set in __init__")
         with _lock:
             if conversation_id not in CONVERSATIONS:
                 raise KeyError(f"Conversation '{conversation_id}' not found")
@@ -78,14 +101,22 @@ class MemoryBackend(AbstractBackend):
 
         return message
 
-    def get_messages(self, conversation_id: int) -> list[Message]:
+    def get_messages(self, conversation_id: int | None = None) -> list[Message]:
+        conversation_id = conversation_id or self.conversation_id
+        if conversation_id is None:
+            raise ValueError("conversation_id must be provided or set in __init__")
         with _lock:
             if conversation_id not in CONVERSATIONS:
                 raise KeyError(f"Conversation '{conversation_id}' not found")
             return CONVERSATIONS[conversation_id].messages
 
-    def add_summary(self, conversation_id: int, summary: Summary) -> Summary:
+    def add_summary(
+        self, summary: Summary, conversation_id: int | None = None
+    ) -> Summary:
         global SUMMARY_COUNTER
+        conversation_id = conversation_id or self.conversation_id
+        if conversation_id is None:
+            raise ValueError("conversation_id must be provided or set in __init__")
         with _lock:
             if conversation_id not in CONVERSATIONS:
                 raise KeyError(f"Conversation '{conversation_id}' not found")
@@ -99,7 +130,10 @@ class MemoryBackend(AbstractBackend):
 
         return summary
 
-    def get_summaries(self, conversation_id: int) -> list[Summary]:
+    def get_summaries(self, conversation_id: int | None = None) -> list[Summary]:
+        conversation_id = conversation_id or self.conversation_id
+        if conversation_id is None:
+            raise ValueError("conversation_id must be provided or set in __init__")
         with _lock:
             if conversation_id not in CONVERSATIONS:
                 raise KeyError(f"Conversation '{conversation_id}' not found")
@@ -125,27 +159,50 @@ class MemoryBackend(AbstractBackend):
             CONVERSATIONS[conversation.id] = conversation
         return conversation
 
-    async def aload(self, conversation_id: int) -> Conversation:
+    async def aload(self, conversation_id: int | None = None) -> Conversation:
+        conversation_id = conversation_id or self.conversation_id
+        if conversation_id is None:
+            raise ValueError("conversation_id must be provided or set in __init__")
         async with _async_lock:
             if conversation_id not in CONVERSATIONS:
                 raise KeyError(f"Conversation '{conversation_id}' not found")
             return CONVERSATIONS[conversation_id]
 
-    async def adelete(self, conversation_id: int) -> None:
+    async def adelete(self, conversation_id: int | None = None) -> None:
+        conversation_id = conversation_id or self.conversation_id
+        if conversation_id is None:
+            raise ValueError("conversation_id must be provided or set in __init__")
         async with _async_lock:
             if conversation_id in CONVERSATIONS:
                 del CONVERSATIONS[conversation_id]
 
-    async def aexists(self, conversation_id: int) -> bool:
+    async def aexists(self, conversation_id: int | None = None) -> bool:
+        conversation_id = conversation_id or self.conversation_id
+        if conversation_id is None:
+            raise ValueError("conversation_id must be provided or set in __init__")
         async with _async_lock:
             return conversation_id in CONVERSATIONS
 
-    async def aupdate_token_counts(self, conversation_id: int) -> None:
-        """Not required here"""
-        pass
+    async def aupdate_token_counts(self, conversation_id: int | None = None) -> None:
+        conversation_id = conversation_id or self.conversation_id
+        if conversation_id is None:
+            raise ValueError("conversation_id must be provided or set in __init__")
+        async with _async_lock:
+            if conversation_id not in CONVERSATIONS:
+                raise KeyError(f"Conversation '{conversation_id}' not found")
 
-    async def aadd_message(self, message: Message, conversation_id: int) -> Message:
+            conv = CONVERSATIONS[conversation_id]
+            for msg in conv.messages:
+                if msg.token_count is None:
+                    msg.token_count = 0
+
+    async def aadd_message(
+        self, message: Message, conversation_id: int | None = None
+    ) -> Message:
         global MESSAGE_COUNTER
+        conversation_id = conversation_id or self.conversation_id
+        if conversation_id is None:
+            raise ValueError("conversation_id must be provided or set in __init__")
         async with _async_lock:
             if conversation_id not in CONVERSATIONS:
                 raise KeyError(f"Conversation '{conversation_id}' not found")
@@ -159,14 +216,22 @@ class MemoryBackend(AbstractBackend):
 
         return message
 
-    async def aget_messages(self, conversation_id: int) -> list[Message]:
+    async def aget_messages(self, conversation_id: int | None = None) -> list[Message]:
+        conversation_id = conversation_id or self.conversation_id
+        if conversation_id is None:
+            raise ValueError("conversation_id must be provided or set in __init__")
         async with _async_lock:
             if conversation_id not in CONVERSATIONS:
                 raise KeyError(f"Conversation '{conversation_id}' not found")
             return CONVERSATIONS[conversation_id].messages
 
-    async def aadd_summary(self, conversation_id: int, summary: Summary) -> Summary:
+    async def aadd_summary(
+        self, summary: Summary, conversation_id: int | None = None
+    ) -> Summary:
         global SUMMARY_COUNTER
+        conversation_id = conversation_id or self.conversation_id
+        if conversation_id is None:
+            raise ValueError("conversation_id must be provided or set in __init__")
         async with _async_lock:
             if conversation_id not in CONVERSATIONS:
                 raise KeyError(f"Conversation '{conversation_id}' not found")
@@ -180,7 +245,10 @@ class MemoryBackend(AbstractBackend):
 
         return summary
 
-    async def aget_summaries(self, conversation_id: int) -> list[Summary]:
+    async def aget_summaries(self, conversation_id: int | None = None) -> list[Summary]:
+        conversation_id = conversation_id or self.conversation_id
+        if conversation_id is None:
+            raise ValueError("conversation_id must be provided or set in __init__")
         async with _async_lock:
             if conversation_id not in CONVERSATIONS:
                 raise KeyError(f"Conversation '{conversation_id}' not found")
