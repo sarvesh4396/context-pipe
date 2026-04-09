@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     environment:
-      name: pypi
+      name: publish
       url: https://pypi.org/project/context-pipe
     permissions:
       id-token: write
