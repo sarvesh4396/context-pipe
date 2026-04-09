@@ -74,7 +74,7 @@ class Conversation:
         summaries: List of summaries of compacted message spans (default empty list).
     """
 
-    id: int | None = None
+    id: int
     messages: list[Message] = field(default_factory=list)
     summaries: list[Summary] = field(default_factory=list)
 
