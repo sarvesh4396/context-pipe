@@ -47,7 +47,7 @@ class AbstractBackend(ABC):
         """Persist a conversation and sync all its messages/summaries (async)."""
 
     @abstractmethod
-    def load(self, conversation_id: int) -> Conversation:
+    def load(self, conversation_id: int | None = None) -> Conversation:
         """Load a conversation with all its messages and summaries (sync).
 
         Raises:
@@ -55,7 +55,7 @@ class AbstractBackend(ABC):
         """
 
     @abstractmethod
-    async def aload(self, conversation_id: int) -> Conversation:
+    async def aload(self, conversation_id: int | None = None) -> Conversation:
         """Load a conversation with all its messages and summaries (async).
 
         Raises:
@@ -63,33 +63,33 @@ class AbstractBackend(ABC):
         """
 
     @abstractmethod
-    def delete(self, conversation_id: int) -> None:
+    def delete(self, conversation_id: int | None = None) -> None:
         """Delete a conversation and all its messages and summaries (sync)."""
 
     @abstractmethod
-    async def adelete(self, conversation_id: int) -> None:
+    async def adelete(self, conversation_id: int | None = None) -> None:
         """Delete a conversation and all its messages and summaries (async)."""
 
     @abstractmethod
-    def exists(self, conversation_id: int) -> bool:
+    def exists(self, conversation_id: int | None = None) -> bool:
         """Return True if the conversation exists (sync)."""
 
     @abstractmethod
-    async def aexists(self, conversation_id: int) -> bool:
+    async def aexists(self, conversation_id: int | None = None) -> bool:
         """Return True if the conversation exists (async)."""
 
     @abstractmethod
-    def update_token_counts(self, conversation_id: int) -> None:
+    def update_token_counts(self, conversation_id: int | None = None) -> None:
         """Recalculate and update token counts for all messages in a conversation (sync)."""
 
     @abstractmethod
-    async def aupdate_token_counts(self, conversation_id: int) -> None:
+    async def aupdate_token_counts(self, conversation_id: int | None = None) -> None:
         """Recalculate and update token counts for all messages in a conversation (async)."""
 
     # --- Message operations ---
 
     @abstractmethod
-    def add_message(self, message: Message, conversation_id: int) -> Message:
+    def add_message(self, message: Message, conversation_id: int | None = None) -> Message:
         """Add a message to a conversation, assigns message.id (sync).
 
         Returns:
@@ -97,7 +97,7 @@ class AbstractBackend(ABC):
         """
 
     @abstractmethod
-    async def aadd_message(self, message: Message, conversation_id: int) -> Message:
+    async def aadd_message(self, message: Message, conversation_id: int | None = None) -> Message:
         """Add a message to a conversation, assigns message.id (async).
 
         Returns:
@@ -105,17 +105,17 @@ class AbstractBackend(ABC):
         """
 
     @abstractmethod
-    def get_messages(self, conversation_id: int) -> list[Message]:
+    def get_messages(self, conversation_id: int | None = None) -> list[Message]:
         """Return all messages for a conversation ordered by insertion (sync)."""
 
     @abstractmethod
-    async def aget_messages(self, conversation_id: int) -> list[Message]:
+    async def aget_messages(self, conversation_id: int | None = None) -> list[Message]:
         """Return all messages for a conversation ordered by insertion (async)."""
 
     # --- Summary operations ---
 
     @abstractmethod
-    def add_summary(self, conversation_id: int, summary: Summary) -> Summary:
+    def add_summary(self, summary: Summary, conversation_id: int | None = None) -> Summary:
         """Add a summary to a conversation, assigns summary.id (sync).
 
         Returns:
@@ -123,7 +123,7 @@ class AbstractBackend(ABC):
         """
 
     @abstractmethod
-    async def aadd_summary(self, conversation_id: int, summary: Summary) -> Summary:
+    async def aadd_summary(self, summary: Summary, conversation_id: int | None = None) -> Summary:
         """Add a summary to a conversation, assigns summary.id (async).
 
         Returns:
@@ -131,11 +131,11 @@ class AbstractBackend(ABC):
         """
 
     @abstractmethod
-    def get_summaries(self, conversation_id: int) -> list[Summary]:
+    def get_summaries(self, conversation_id: int | None = None) -> list[Summary]:
         """Return all summaries for a conversation ordered by insertion (sync)."""
 
     @abstractmethod
-    async def aget_summaries(self, conversation_id: int) -> list[Summary]:
+    async def aget_summaries(self, conversation_id: int | None = None) -> list[Summary]:
         """Return all summaries for a conversation ordered by insertion (async)."""
 
 
