@@ -9,46 +9,54 @@ from context_pipe.schemas import Conversation, Message, Role, Summary, WipeMode
 class AbstractBackend(ABC):
     """Abstract base class for conversation persistence backends.
 
-    Backends are responsible for storing and retrieving conversations
-    to pluggable storage systems (memory, Redis, SQL databases, etc.).
+    Backends store conversations, messages, and summaries as separate entities
+    with relationships managed by the backend (not embedded in the schema).
 
-    All backends must implement both sync and async versions of methods:
-    - save/asave, load/aload, delete/adelete, exists/aexists
-    - create/acreate for creating new conversations with auto-generated IDs
+    All backends must implement both sync and async versions of:
+    - create/acreate: create a new conversation, returns Conversation with assigned id
+    - save/asave: persist a conversation and all its messages/summaries
+    - load/aload: load a conversation with all its messages and summaries
+    - delete/adelete: delete a conversation and all related messages/summaries
+    - exists/aexists: check if a conversation exists
+    - add_message/aadd_message: add a single message to a conversation
+    - add_summary/aadd_summary: add a single summary to a conversation
+    - get_messages/aget_messages: fetch messages for a conversation
+    - get_summaries/aget_summaries: fetch summaries for a conversation
     """
 
-    def create(self) -> None:
-        """Create a new conversation with an auto-generated ID (sync).
+    def __init__(self, conversation_id: int | None = None) -> None:
+        """Initialize the backend."""
+        self.conversation_id = conversation_id
 
-        Returns:
-            A new Conversation instance with auto-generated ID.
-        """
+    # --- Conversation lifecycle ---
 
-    async def acreate(self) -> None:
-        """Create a new conversation with an auto-generated ID (async).
-
-        Returns:
-            A new Conversation instance with auto-generated ID.
-        """
-
-    # Sync versions
     @abstractmethod
-    def save(self, conversation: Conversation) -> None:
-        """Save a conversation to the backend (sync).
+    def create(self) -> Conversation:
+        """Create and persist a new empty conversation (sync)."""
 
-        Args:
-            conversation: The conversation to save.
-        """
+    @abstractmethod
+    async def acreate(self) -> Conversation:
+        """Create and persist a new empty conversation (async)."""
+
+    @abstractmethod
+    def save(self, conversation: Conversation) -> Conversation:
+        """Persist a conversation and sync all its messages/summaries (sync)."""
+
+    @abstractmethod
+    async def asave(self, conversation: Conversation) -> Conversation:
+        """Persist a conversation and sync all its messages/summaries (async)."""
 
     @abstractmethod
     def load(self, conversation_id: int) -> Conversation:
-        """Load a conversation from the backend (sync).
+        """Load a conversation with all its messages and summaries (sync).
 
-        Args:
-            conversation_id: The ID of the conversation to load.
+        Raises:
+            KeyError: If the conversation does not exist.
+        """
 
-        Returns:
-            The loaded conversation.
+    @abstractmethod
+    async def aload(self, conversation_id: int) -> Conversation:
+        """Load a conversation with all its messages and summaries (async).
 
         Raises:
             KeyError: If the conversation does not exist.
@@ -56,64 +64,79 @@ class AbstractBackend(ABC):
 
     @abstractmethod
     def delete(self, conversation_id: int) -> None:
-        """Delete a conversation from the backend (sync).
-
-        Args:
-            conversation_id: The ID of the conversation to delete.
-        """
-
-    @abstractmethod
-    def exists(self, conversation_id: int) -> bool:
-        """Check if a conversation exists in the backend (sync).
-
-        Args:
-            conversation_id: The ID of the conversation to check.
-
-        Returns:
-            True if the conversation exists, False otherwise.
-        """
-
-    # Async versions
-    @abstractmethod
-    async def asave(self, conversation: Conversation) -> None:
-        """Save a conversation to the backend (async).
-
-        Args:
-            conversation: The conversation to save.
-        """
-
-    @abstractmethod
-    async def aload(self, conversation_id: int) -> Conversation:
-        """Load a conversation from the backend (async).
-
-        Args:
-            conversation_id: The ID of the conversation to load.
-
-        Returns:
-            The loaded conversation.
-
-        Raises:
-            KeyError: If the conversation does not exist.
-        """
+        """Delete a conversation and all its messages and summaries (sync)."""
 
     @abstractmethod
     async def adelete(self, conversation_id: int) -> None:
-        """Delete a conversation from the backend (async).
+        """Delete a conversation and all its messages and summaries (async)."""
 
-        Args:
-            conversation_id: The ID of the conversation to delete.
-        """
+    @abstractmethod
+    def exists(self, conversation_id: int) -> bool:
+        """Return True if the conversation exists (sync)."""
 
     @abstractmethod
     async def aexists(self, conversation_id: int) -> bool:
-        """Check if a conversation exists in the backend (async).
+        """Return True if the conversation exists (async)."""
 
-        Args:
-            conversation_id: The ID of the conversation to check.
+    @abstractmethod
+    def update_token_counts(self, conversation_id: int) -> None:
+        """Recalculate and update token counts for all messages in a conversation (sync)."""
+
+    @abstractmethod
+    async def aupdate_token_counts(self, conversation_id: int) -> None:
+        """Recalculate and update token counts for all messages in a conversation (async)."""
+
+    # --- Message operations ---
+
+    @abstractmethod
+    def add_message(self, message: Message, conversation_id: int) -> Message:
+        """Add a message to a conversation, assigns message.id (sync).
 
         Returns:
-            True if the conversation exists, False otherwise.
+            The message with its assigned id.
         """
+
+    @abstractmethod
+    async def aadd_message(self, message: Message, conversation_id: int) -> Message:
+        """Add a message to a conversation, assigns message.id (async).
+
+        Returns:
+            The message with its assigned id.
+        """
+
+    @abstractmethod
+    def get_messages(self, conversation_id: int) -> list[Message]:
+        """Return all messages for a conversation ordered by insertion (sync)."""
+
+    @abstractmethod
+    async def aget_messages(self, conversation_id: int) -> list[Message]:
+        """Return all messages for a conversation ordered by insertion (async)."""
+
+    # --- Summary operations ---
+
+    @abstractmethod
+    def add_summary(self, conversation_id: int, summary: Summary) -> Summary:
+        """Add a summary to a conversation, assigns summary.id (sync).
+
+        Returns:
+            The summary with its assigned id.
+        """
+
+    @abstractmethod
+    async def aadd_summary(self, conversation_id: int, summary: Summary) -> Summary:
+        """Add a summary to a conversation, assigns summary.id (async).
+
+        Returns:
+            The summary with its assigned id.
+        """
+
+    @abstractmethod
+    def get_summaries(self, conversation_id: int) -> list[Summary]:
+        """Return all summaries for a conversation ordered by insertion (sync)."""
+
+    @abstractmethod
+    async def aget_summaries(self, conversation_id: int) -> list[Summary]:
+        """Return all summaries for a conversation ordered by insertion (async)."""
 
 
 class AbstractCompactor(ABC):
@@ -197,7 +220,7 @@ class CompactionEngine:
         Returns:
             The conversation after compaction (if applicable).
         """
-        total_tokens = conv.total_tokens()
+        total_tokens = conv.total_tokens
         threshold = self.policy.token_budget * self.policy.trigger_at
 
         if total_tokens < threshold:
