@@ -11,23 +11,14 @@ requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
-memory = ["context-pipe-memory==0.1.0"]
-redis = ["context-pipe-redis==0.1.0"]
-sqlalchemy = ["context-pipe-sqlalchemy==0.1.0"]
+memory = []
+redis = ["redis[asyncio]>=5.0"]
+sqlalchemy = ["sqlalchemy[asyncio]>=2.0", "aiosqlite>=0.20"]
 all = [
-    "context-pipe-memory==0.1.0",
-    "context-pipe-redis==0.1.0",
-    "context-pipe-sqlalchemy==0.1.0",
+    "redis[asyncio]>=5.0",
+    "sqlalchemy[asyncio]>=2.0",
+    "aiosqlite>=0.20",
 ]
-
-[tool.uv.workspace]
-members = [".", "packages/*"]
-
-[tool.uv.sources]
-context-pipe = { workspace = true }
-context-pipe-memory = { workspace = true }
-context-pipe-redis = { workspace = true }
-context-pipe-sqlalchemy = { workspace = true }
 
 [build-system]
 requires = ["uv_build>=0.11.3,<0.12.0"]
