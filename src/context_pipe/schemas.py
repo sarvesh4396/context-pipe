@@ -38,6 +38,7 @@ class Message:
         metadata: Additional metadata associated with the message (default empty dict).
         created_at: Timestamp when the message was created (default current time).
     """
+
     role: Role
     content: str
     token_count: int = 0
@@ -78,6 +79,7 @@ class Conversation:
     messages: list[Message] = field(default_factory=list)
     summaries: list[Summary] = field(default_factory=list)
 
+    @property
     def total_tokens(self) -> int:
         """Calculate the total number of tokens in the conversation.
 
@@ -85,19 +87,3 @@ class Conversation:
             The sum of token counts across all messages.
         """
         return sum(msg.token_count for msg in self.messages)
-
-    def active_messages(self) -> list[Message]:
-        """Get the list of active (non-summarized) messages.
-
-        Returns:
-            A copy of the messages list.
-        """
-        return list(self.messages)
-
-    def append(self, message: Message) -> None:
-        """Append a message to the conversation.
-
-        Args:
-            message: The message to append.
-        """
-        self.messages.append(message)
