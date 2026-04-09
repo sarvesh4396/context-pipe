@@ -77,6 +77,20 @@ class RedisBackend(AbstractBackend):
         else:
             raise ValueError(f"Unknown entity type: {of}")
 
+    def _build_object_key(
+        self, of: Literal["conversation", "message", "summary"], object_id: int | str
+    ) -> str:
+        """Build the Redis key for a specific conversation, message, or summary.
+
+        Args:
+            of: The type of the entity ("conversation", "message", or "summary").
+            object_id: The ID of the specific object.
+
+        Returns:
+            The full Redis key for the object.
+        """
+        return f"{self.prefix}{of}:{object_id}"
+
     @staticmethod
     def _deserialize_conversation(data: dict[str, object]) -> Conversation:
         """Deserialize a stored conversation dict back to a Conversation object.
