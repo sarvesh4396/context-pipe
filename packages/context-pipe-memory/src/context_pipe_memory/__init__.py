@@ -8,166 +8,183 @@ from threading import Lock
 from context_pipe import AbstractBackend
 from context_pipe.schemas import Conversation, Message, Role, Summary
 
+CONVERSATIONS: dict[int, Conversation] = {}
+MESSAGES: dict[int, Message] = {}  #
+SUMMARIES: dict[int, Summary] = {}
+
+CONVERSATION_COUNTER = 0
+MESSAGE_COUNTER = 0
+SUMMARY_COUNTER = 0
+
+_lock = Lock()
+_async_lock = asyncio.Lock()
+
 
 class MemoryBackend(AbstractBackend):
-    """In-process memory backend for storing conversations.
-
-    Stores conversations in a dictionary protected by locks
-    for thread-safe concurrent access. Supports both sync and async operations.
-    """
-
     def __init__(self) -> None:
-        """Initialize the memory backend."""
-        self._store: dict[str, dict[str, object]] = {}
-        self._lock = Lock()  # For sync operations
-        self._async_lock = asyncio.Lock()  # For async operations
+        pass
 
-    @staticmethod
-    def _deserialize_conversation(data: dict[str, object]) -> Conversation:
-        """Deserialize a stored conversation dict back to a Conversation object.
+    def create(self) -> Conversation:
+        global CONVERSATION_COUNTER
+        with _lock:
+            CONVERSATION_COUNTER += 1
+            conversation_id = CONVERSATION_COUNTER
 
-        Args:
-            data: The stored conversation data (dict).
-
-        Returns:
-            A properly typed Conversation object.
-        """
-        # Deserialize messages
-        messages = []
-        for msg_dict in data.get("messages", []):
-            msg = Message(
-                role=Role(msg_dict["role"])
-                if isinstance(msg_dict["role"], str)
-                else msg_dict["role"],
-                content=msg_dict["content"],
-                token_count=msg_dict.get("token_count", 0),
-                metadata=msg_dict.get("metadata", {}),
-                created_at=datetime.fromisoformat(msg_dict["created_at"])
-                if isinstance(msg_dict["created_at"], str)
-                else msg_dict["created_at"],
-            )
-            messages.append(msg)
-
-        # Deserialize summaries
-        summaries = []
-        for s_dict in data.get("summaries", []):
-            s = Summary(
-                text=s_dict["text"],
-                span_start=s_dict["span_start"],
-                span_end=s_dict["span_end"],
-                compacted_at=datetime.fromisoformat(s_dict["compacted_at"])
-                if isinstance(s_dict["compacted_at"], str)
-                else s_dict["compacted_at"],
-            )
-            summaries.append(s)
-
-        return Conversation(
-            id=data["id"],
-            messages=messages,
-            summaries=summaries,
+        conversation = Conversation(
+            id=conversation_id,
+            messages=[],
+            summaries=[],
         )
 
-    # Sync versions
-    def save(self, conversation: Conversation) -> None:
-        """Save a conversation to memory (sync).
+        self.save(conversation)
+        return conversation
 
-        Args:
-            conversation: The conversation to save.
-        """
-        with self._lock:
-            self._store[conversation.id] = asdict(conversation)
+    def save(self, conversation: Conversation) -> Conversation:
+        with _lock:
+            CONVERSATIONS[conversation.id] = conversation
+        return conversation
 
     def load(self, conversation_id: int) -> Conversation:
-        """Load a conversation from memory (sync).
-
-        Args:
-            conversation_id: The ID of the conversation to load.
-
-        Returns:
-            The loaded conversation.
-
-        Raises:
-            KeyError: If the conversation does not exist.
-        """
-        with self._lock:
-            if conversation_id not in self._store:
+        with _lock:
+            if conversation_id not in CONVERSATIONS:
                 raise KeyError(f"Conversation '{conversation_id}' not found")
-
-            data = self._store[conversation_id]
-            return self._deserialize_conversation(data)
+            return CONVERSATIONS[conversation_id]
 
     def delete(self, conversation_id: int) -> None:
-        """Delete a conversation from memory (sync).
-
-        Args:
-            conversation_id: The ID of the conversation to delete.
-        """
-        with self._lock:
-            if conversation_id in self._store:
-                del self._store[conversation_id]
+        with _lock:
+            if conversation_id in CONVERSATIONS:
+                del CONVERSATIONS[conversation_id]
 
     def exists(self, conversation_id: int) -> bool:
-        """Check if a conversation exists in memory (sync).
+        with _lock:
+            return conversation_id in CONVERSATIONS
 
-        Args:
-            conversation_id: The ID of the conversation to check.
+    def update_token_counts(self, conversation_id: int) -> None:
+        """Not required here"""
+        pass
 
-        Returns:
-            True if the conversation exists, False otherwise.
-        """
-        with self._lock:
-            return conversation_id in self._store
-
-    # Async versions
-    async def asave(self, conversation: Conversation) -> None:
-        """Save a conversation to memory (async).
-
-        Args:
-            conversation: The conversation to save.
-        """
-        async with self._async_lock:
-            self._store[conversation.id] = asdict(conversation)
-
-    async def aload(self, conversation_id: int) -> Conversation:
-        """Load a conversation from memory (async).
-
-        Args:
-            conversation_id: The ID of the conversation to load.
-
-        Returns:
-            The loaded conversation.
-
-        Raises:
-            KeyError: If the conversation does not exist.
-        """
-        async with self._async_lock:
-            if conversation_id not in self._store:
+    def add_message(self, message: Message, conversation_id: int) -> Message:
+        global MESSAGE_COUNTER
+        with _lock:
+            if conversation_id not in CONVERSATIONS:
                 raise KeyError(f"Conversation '{conversation_id}' not found")
 
-            data = self._store[conversation_id]
-            return self._deserialize_conversation(data)
+            MESSAGE_COUNTER += 1
+            message_id = MESSAGE_COUNTER
+            message.id = message_id
+
+            MESSAGES[message_id] = message
+            CONVERSATIONS[conversation_id].messages.append(message)
+
+        return message
+
+    def get_messages(self, conversation_id: int) -> list[Message]:
+        with _lock:
+            if conversation_id not in CONVERSATIONS:
+                raise KeyError(f"Conversation '{conversation_id}' not found")
+            return CONVERSATIONS[conversation_id].messages
+
+    def add_summary(self, conversation_id: int, summary: Summary) -> Summary:
+        global SUMMARY_COUNTER
+        with _lock:
+            if conversation_id not in CONVERSATIONS:
+                raise KeyError(f"Conversation '{conversation_id}' not found")
+
+            SUMMARY_COUNTER += 1
+            summary_id = SUMMARY_COUNTER
+            summary.id = summary_id
+
+            SUMMARIES[summary_id] = summary
+            CONVERSATIONS[conversation_id].summaries.append(summary)
+
+        return summary
+
+    def get_summaries(self, conversation_id: int) -> list[Summary]:
+        with _lock:
+            if conversation_id not in CONVERSATIONS:
+                raise KeyError(f"Conversation '{conversation_id}' not found")
+            return CONVERSATIONS[conversation_id].summaries
+
+    async def acreate(self) -> Conversation:
+        global CONVERSATION_COUNTER
+        async with _async_lock:
+            CONVERSATION_COUNTER += 1
+            conversation_id = CONVERSATION_COUNTER
+
+        conversation = Conversation(
+            id=conversation_id,
+            messages=[],
+            summaries=[],
+        )
+
+        await self.asave(conversation)
+        return conversation
+
+    async def asave(self, conversation: Conversation) -> Conversation:
+        async with _async_lock:
+            CONVERSATIONS[conversation.id] = conversation
+        return conversation
+
+    async def aload(self, conversation_id: int) -> Conversation:
+        async with _async_lock:
+            if conversation_id not in CONVERSATIONS:
+                raise KeyError(f"Conversation '{conversation_id}' not found")
+            return CONVERSATIONS[conversation_id]
 
     async def adelete(self, conversation_id: int) -> None:
-        """Delete a conversation from memory (async).
-
-        Args:
-            conversation_id: The ID of the conversation to delete.
-        """
-        async with self._async_lock:
-            if conversation_id in self._store:
-                del self._store[conversation_id]
+        async with _async_lock:
+            if conversation_id in CONVERSATIONS:
+                del CONVERSATIONS[conversation_id]
 
     async def aexists(self, conversation_id: int) -> bool:
-        """Check if a conversation exists in memory (async).
+        async with _async_lock:
+            return conversation_id in CONVERSATIONS
 
-        Args:
-            conversation_id: The ID of the conversation to check.
+    async def aupdate_token_counts(self, conversation_id: int) -> None:
+        """Not required here"""
+        pass
 
-        Returns:
-            True if the conversation exists, False otherwise.
-        """
-        async with self._async_lock:
-            return conversation_id in self._store
+    async def aadd_message(self, message: Message, conversation_id: int) -> Message:
+        global MESSAGE_COUNTER
+        async with _async_lock:
+            if conversation_id not in CONVERSATIONS:
+                raise KeyError(f"Conversation '{conversation_id}' not found")
+
+            MESSAGE_COUNTER += 1
+            message_id = MESSAGE_COUNTER
+            message.id = message_id
+
+            MESSAGES[message_id] = message
+            CONVERSATIONS[conversation_id].messages.append(message)
+
+        return message
+
+    async def aget_messages(self, conversation_id: int) -> list[Message]:
+        async with _async_lock:
+            if conversation_id not in CONVERSATIONS:
+                raise KeyError(f"Conversation '{conversation_id}' not found")
+            return CONVERSATIONS[conversation_id].messages
+
+    async def aadd_summary(self, conversation_id: int, summary: Summary) -> Summary:
+        global SUMMARY_COUNTER
+        async with _async_lock:
+            if conversation_id not in CONVERSATIONS:
+                raise KeyError(f"Conversation '{conversation_id}' not found")
+
+            SUMMARY_COUNTER += 1
+            summary_id = SUMMARY_COUNTER
+            summary.id = summary_id
+
+            SUMMARIES[summary_id] = summary
+            CONVERSATIONS[conversation_id].summaries.append(summary)
+
+        return summary
+
+    async def aget_summaries(self, conversation_id: int) -> list[Summary]:
+        async with _async_lock:
+            if conversation_id not in CONVERSATIONS:
+                raise KeyError(f"Conversation '{conversation_id}' not found")
+            return CONVERSATIONS[conversation_id].summaries
 
 
 __all__ = ["MemoryBackend"]
