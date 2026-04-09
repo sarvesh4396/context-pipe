@@ -38,10 +38,10 @@ class Message:
         metadata: Additional metadata associated with the message (default empty dict).
         created_at: Timestamp when the message was created (default current time).
     """
-    id: int
     role: Role
     content: str
     token_count: int = 0
+    id: int | None = None
     metadata: dict[str, object] = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.now)
 
@@ -56,10 +56,11 @@ class Summary:
         span_end: The index of the last message in the summarized span.
         compacted_at: Timestamp when the summary was created (default current time).
     """
-    id: int
+
     text: str
     span_start: int
     span_end: int
+    id: int | None = None
     compacted_at: datetime = field(default_factory=datetime.now)
 
 
@@ -73,7 +74,7 @@ class Conversation:
         summaries: List of summaries of compacted message spans (default empty list).
     """
 
-    id: int
+    id: int | None = None
     messages: list[Message] = field(default_factory=list)
     summaries: list[Summary] = field(default_factory=list)
 
