@@ -14,7 +14,22 @@ class AbstractBackend(ABC):
 
     All backends must implement both sync and async versions of methods:
     - save/asave, load/aload, delete/adelete, exists/aexists
+    - create/acreate for creating new conversations with auto-generated IDs
     """
+
+    def create(self) -> None:
+        """Create a new conversation with an auto-generated ID (sync).
+
+        Returns:
+            A new Conversation instance with auto-generated ID.
+        """
+
+    async def acreate(self) -> None:
+        """Create a new conversation with an auto-generated ID (async).
+
+        Returns:
+            A new Conversation instance with auto-generated ID.
+        """
 
     # Sync versions
     @abstractmethod
