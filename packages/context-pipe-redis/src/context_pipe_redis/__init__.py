@@ -5,7 +5,7 @@ import json
 from dataclasses import asdict
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Union
+from typing import Literal, Optional, Union
 
 import redis
 import redis.asyncio as redis_async
@@ -37,6 +37,10 @@ class RedisBackend(AbstractBackend):
     Supports both sync and async operations.
     """
 
+    GLOBAL_CONVERSATION_COUNTER_KEY = "conversation:id"
+    GLOBAL_MESSAGE_COUNTER_KEY = "message:id"
+    GLOBAL_SUMMARY_COUNTER_KEY = "summary:id"
+
     def __init__(
         self,
         client: redis.Redis | redis_async.Redis,
@@ -55,16 +59,23 @@ class RedisBackend(AbstractBackend):
         self.prefix = prefix
         self.ttl_seconds = ttl_seconds
 
-    def _key(self, conversation_id: str) -> str:
-        """Generate a Redis key for a conversation.
+    def _key(self, of: Literal["conversation", "message", "summary"]) -> str:
+        """Generate a Redis key for a conversation, message, or summary.
 
         Args:
-            conversation_id: The conversation ID.
+            of: The type of the entity ("conversation", "message", or "summary").
 
         Returns:
             The full Redis key.
         """
-        return f"{self.prefix}{conversation_id}"
+        if of == "conversation":
+            return f"{self.prefix}{self.GLOBAL_CONVERSATION_COUNTER_KEY}"
+        elif of == "message":
+            return f"{self.prefix}{self.GLOBAL_MESSAGE_COUNTER_KEY}"
+        elif of == "summary":
+            return f"{self.prefix}{self.GLOBAL_SUMMARY_COUNTER_KEY}"
+        else:
+            raise ValueError(f"Unknown entity type: {of}")
 
     @staticmethod
     def _deserialize_conversation(data: dict[str, object]) -> Conversation:
@@ -112,6 +123,29 @@ class RedisBackend(AbstractBackend):
         )
 
     # Sync versions
+    def create(self) -> Conversation:
+        """Create a new conversation with an auto-generated ID (sync).
+
+        Returns:
+            A new Conversation instance with auto-generated ID.
+        """
+        if self.is_async:
+            return asyncio.run(self.acreate())
+
+        # Atomic ID generation
+        conversation_id = int(self.client.incr(self._key("conversation")))  # type: ignore[union-attr]
+
+        conversation = Conversation(
+            id=conversation_id,
+            messages=[],
+            summaries=[],
+        )
+
+        # Optional: persist immediately
+        self.save(conversation)
+
+        return conversation
+
     def save(self, conversation: Conversation) -> None:
         """Save a conversation to Redis (sync).
 
@@ -184,6 +218,26 @@ class RedisBackend(AbstractBackend):
             return bool(self.client.exists(key))  # type: ignore[union-attr]
 
     # Async versions
+    async def acreate(self) -> Conversation:
+        """Create a new conversation with an auto-generated ID (async).
+
+        Returns:
+            A new Conversation instance with auto-generated ID.
+        """
+
+        conversation_id = int(await self.client.incr(self._key("conversation")))  # type: ignore[union-attr]
+
+        conversation = Conversation(
+            id=conversation_id,
+            messages=[],
+            summaries=[],
+        )
+
+        # Optional: persist immediately
+        await self.asave(conversation)
+
+        return conversation
+
     async def asave(self, conversation: Conversation) -> None:
         """Save a conversation to Redis (async).
 
