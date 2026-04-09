@@ -1,0 +1,53 @@
+# mkdocs.yml
+
+site_name: context-pipe
+site_description: Extensible conversation context management toolkit for LLM applications
+repo_url: https://github.com/sarvesh4396/context-pipe
+site_url: https://sarvesh4396.github.io/context-pipe/
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - API Reference:
+      - core: api/core.md
+      - memory: api/memory.md
+      - redis: api/redis.md
+      - sqlalchemy: api/sqlalchemy.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          import_statement: from context_pipe import
+          show_source: true
+          show_bases: true
+
+markdown_extensions:
+  - admonition
+  - pymdown.extensions.highlight:
+      use_pygments: true
+  - pymdown.extensions.superfences
+  - pymdown.extensions.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
