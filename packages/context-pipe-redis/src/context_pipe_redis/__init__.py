@@ -3,13 +3,31 @@
 import asyncio
 import json
 from dataclasses import asdict
+from datetime import datetime
+from enum import Enum
 from typing import Optional, Union
 
 import redis
 import redis.asyncio as redis_async
 
 from context_pipe import AbstractBackend
-from context_pipe.schemas import Conversation
+from context_pipe.schemas import Conversation, Message, Role, Summary
+
+
+def _json_serializer(obj: object) -> str:
+    """Custom JSON serializer for objects not serializable by default.
+
+    Args:
+        obj: The object to serialize.
+
+    Returns:
+        The serialized string representation.
+    """
+    if isinstance(obj, Enum):
+        return obj.value
+    elif isinstance(obj, datetime):
+        return obj.isoformat()
+    return str(obj)
 
 
 class RedisBackend(AbstractBackend):
@@ -37,7 +55,7 @@ class RedisBackend(AbstractBackend):
         self.prefix = prefix
         self.ttl_seconds = ttl_seconds
 
-    def _key(self, conversation_id: int) -> str:
+    def _key(self, conversation_id: str) -> str:
         """Generate a Redis key for a conversation.
 
         Args:
@@ -47,6 +65,51 @@ class RedisBackend(AbstractBackend):
             The full Redis key.
         """
         return f"{self.prefix}{conversation_id}"
+
+    @staticmethod
+    def _deserialize_conversation(data: dict[str, object]) -> Conversation:
+        """Deserialize a stored conversation dict back to a Conversation object.
+
+        Args:
+            data: The stored conversation data (dict).
+
+        Returns:
+            A properly typed Conversation object.
+        """
+        # Deserialize messages
+        messages = []
+        for msg_dict in data.get("messages", []):  # type: ignore
+            msg = Message(
+                role=Role(msg_dict["role"])
+                if isinstance(msg_dict["role"], str)
+                else msg_dict["role"],
+                content=msg_dict["content"],
+                token_count=msg_dict.get("token_count", 0),
+                metadata=msg_dict.get("metadata", {}),
+                created_at=datetime.fromisoformat(msg_dict["created_at"])
+                if isinstance(msg_dict["created_at"], str)
+                else msg_dict["created_at"],
+            )
+            messages.append(msg)
+
+        # Deserialize summaries
+        summaries = []
+        for s_dict in data.get("summaries", []):  # type: ignore
+            s = Summary(
+                text=s_dict["text"],
+                span_start=s_dict["span_start"],
+                span_end=s_dict["span_end"],
+                compacted_at=datetime.fromisoformat(s_dict["compacted_at"])
+                if isinstance(s_dict["compacted_at"], str)
+                else s_dict["compacted_at"],
+            )
+            summaries.append(s)
+
+        return Conversation(
+            id=data["id"],  # type: ignore
+            messages=messages,
+            summaries=summaries,
+        )
 
     # Sync versions
     def save(self, conversation: Conversation) -> None:
@@ -61,7 +124,7 @@ class RedisBackend(AbstractBackend):
             key = self._key(conversation.id)
             data = json.dumps(
                 asdict(conversation),
-                default=str,  # Handle datetime serialization
+                default=_json_serializer,
             )
 
             if self.ttl_seconds:
@@ -91,7 +154,7 @@ class RedisBackend(AbstractBackend):
                 raise KeyError(f"Conversation '{conversation_id}' not found")
 
             parsed = json.loads(data)
-            return Conversation(**parsed)
+            return self._deserialize_conversation(parsed)
 
     def delete(self, conversation_id: int) -> None:
         """Delete a conversation from Redis (sync).
@@ -130,7 +193,7 @@ class RedisBackend(AbstractBackend):
         key = self._key(conversation.id)
         data = json.dumps(
             asdict(conversation),
-            default=str,  # Handle datetime serialization
+            default=_json_serializer,
         )
 
         if self.ttl_seconds:
@@ -157,7 +220,7 @@ class RedisBackend(AbstractBackend):
             raise KeyError(f"Conversation '{conversation_id}' not found")
 
         parsed = json.loads(data)
-        return Conversation(**parsed)
+        return self._deserialize_conversation(parsed)
 
     async def adelete(self, conversation_id: int) -> None:
         """Delete a conversation from Redis (async).
