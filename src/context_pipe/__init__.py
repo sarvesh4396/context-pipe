@@ -3,7 +3,9 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
-from context_pipe.schemas import Conversation, Message, Role, Summary, WipeMode
+from context_pipe.compactors import AbstractCompactor
+from context_pipe.schemas import CompactionPolicy, Conversation, Message, Role, Summary, WipeMode
+from context_pipe.strategy import AbstractCompactionStrategy
 
 
 class AbstractBackend(ABC):
@@ -24,7 +26,7 @@ class AbstractBackend(ABC):
     - get_summaries/aget_summaries: fetch summaries for a conversation
     """
 
-    def __init__(self, conversation_id: int | None = None) -> None:
+    def __init__(self, conversation_id: int | None = None, compact_engine) -> None:
         """Initialize the backend."""
         self.conversation_id = conversation_id
 
@@ -139,80 +141,38 @@ class AbstractBackend(ABC):
         """Return all summaries for a conversation ordered by insertion (async)."""
 
 
-class AbstractCompactor(ABC):
-    """Abstract base class for message compaction strategies.
 
-    Compactors summarize a series of messages into a shorter summary
-    to reduce context window usage. Implementations can use any LLM
-    or heuristic algorithm to generate summaries.
-
-    All compactors must implement both sync and async versions:
-    - summarize/asummarize
-    """
-
-    @abstractmethod
-    def summarize(self, messages: list[Message]) -> str:
-        """Summarize a list of messages (sync).
-
-        Args:
-            messages: The list of messages to summarize.
-
-        Returns:
-            A summary string of the messages.
-        """
-
-    @abstractmethod
-    async def asummarize(self, messages: list[Message]) -> str:
-        """Summarize a list of messages (async).
-
-        Args:
-            messages: The list of messages to summarize.
-
-        Returns:
-            A summary string of the messages.
-        """
-
-
-@dataclass
-class WindowPolicy:
-    """Policy for managing conversation context within a token budget.
-
-    Attributes:
-        token_budget: The maximum number of tokens allowed in the conversation (default 4096).
-        trigger_at: The ratio of token usage that triggers compaction (default 0.85 = 85%).
-        keep_n_recent: The number of recent messages to keep when wiping old messages (default 6).
-        wipe_mode: How to handle old messages when compacting (default WipeMode.WIPE).
-    """
-
-    token_budget: int = 4096
-    trigger_at: float = 0.85
-    keep_n_recent: int = 6
-    wipe_mode: WipeMode = WipeMode.WIPE
 
 
 class CompactionEngine:
-    """Engine for compacting conversations when approaching token limits.
+    """Engine for compacting conversations using a configurable strategy.
 
-    Takes a WindowPolicy and an AbstractCompactor to manage conversation
-    history within token budgets.
+    Takes a CompactionStrategy and an AbstractCompactor to manage conversation
+    history according to the selected strategy (token-based, message-count, etc).
     """
 
-    def __init__(self, policy: WindowPolicy, compactor: AbstractCompactor) -> None:
+    def __init__(
+        self,
+        strategy: AbstractCompactionStrategy,
+        compactor: AbstractCompactor,
+        policy: CompactionPolicy,
+    ) -> None:
         """Initialize the compaction engine.
 
         Args:
-            policy: The window policy for token budget management.
+            strategy: The compaction strategy that determines when to compact.
             compactor: The compactor instance for summarizing messages.
+            policy: The window policy for wipe behavior (uses defaults if not provided).
         """
-        self.policy = policy
+        self.strategy = strategy
         self.compactor = compactor
+        self.policy = policy
 
     async def maybe_compact(self, conv: Conversation) -> Conversation:
         """Check if compaction is needed and compact if threshold is met.
 
-        Checks if the conversation has reached the trigger threshold (e.g., 85%
-        of the token budget). If so, summarizes old messages and applies the
-        wipe mode to remove them if configured.
+        Uses the configured strategy to determine if compaction is needed.
+        If triggered, summarizes old messages and applies the wipe mode.
 
         Args:
             conv: The conversation to potentially compact.
@@ -220,26 +180,27 @@ class CompactionEngine:
         Returns:
             The conversation after compaction (if applicable).
         """
-        total_tokens = conv.total_tokens
-        threshold = self.policy.token_budget * self.policy.trigger_at
+        if not self.strategy.should_compact(conv):
+            return conv
 
-        if total_tokens < threshold:
+        # Get messages to summarize according to strategy
+        messages_to_summarize = self.strategy.get_messages_to_summarize(conv)
+        if not messages_to_summarize:
             return conv
 
         # Summarize old messages
-        messages_to_summarize = conv.messages[: -self.policy.keep_n_recent]
-        if messages_to_summarize:
-            summary_text = await self.compactor.asummarize(messages_to_summarize)
-            summary = Summary(
-                text=summary_text,
-                span_start=0,
-                span_end=len(messages_to_summarize) - 1,
-            )
-            conv.summaries.append(summary)
+        summary_text = await self.compactor.asummarize(messages_to_summarize)
+        summary = Summary(
+            text=summary_text,
+            span_start=0,
+            span_end=len(messages_to_summarize) - 1,
+        )
+        conv.summaries.append(summary)
 
-            # Apply wipe mode
-            if self.policy.wipe_mode == WipeMode.WIPE:
-                conv.messages = conv.messages[-self.policy.keep_n_recent :]
+        # Apply wipe mode
+        if self.policy.wipe_mode == WipeMode.WIPE:
+            keep_n = self.policy.keep_n_recent
+            conv.messages = conv.messages[-keep_n:]
 
         return conv
 
@@ -252,6 +213,6 @@ __all__ = [
     "Conversation",
     "AbstractBackend",
     "AbstractCompactor",
-    "WindowPolicy",
+    "AbstractCompactionStrategy",
     "CompactionEngine",
 ]
