@@ -7,17 +7,18 @@ license = { text = "MIT" }
 authors = [
     { name = "Sarvesh Kr. Dwivedi", email = "heysarvesh@pm.me" }
 ]
-requires-python = ">=3.11"
-dependencies = []
+requires-python = ">=3.10"
 
 [project.optional-dependencies]
 memory = []
 redis = ["redis[asyncio]>=5.0"]
 sqlalchemy = ["sqlalchemy[asyncio]>=2.0", "aiosqlite>=0.20"]
+compactors = ["openai>=1.0.0"]
 all = [
     "redis[asyncio]>=5.0",
     "sqlalchemy[asyncio]>=2.0",
     "aiosqlite>=0.20",
+    "openai>=1.0.0",
 ]
 
 [build-system]

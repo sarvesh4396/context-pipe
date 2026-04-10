@@ -8,6 +8,67 @@ from context_pipe.schemas import CompactionPolicy, Conversation, Message, Role, 
 from context_pipe.strategy import AbstractCompactionStrategy
 
 
+class CompactionEngine:
+    """Engine for compacting conversations using a configurable strategy.
+
+    Takes a CompactionStrategy and an AbstractCompactor to manage conversation
+    history according to the selected strategy (token-based, message-count, etc).
+    """
+
+    def __init__(
+        self,
+        strategy: AbstractCompactionStrategy,
+        compactor: AbstractCompactor,
+        policy: CompactionPolicy,
+    ) -> None:
+        """Initialize the compaction engine.
+
+        Args:
+            strategy: The compaction strategy that determines when to compact.
+            compactor: The compactor instance for summarizing messages.
+            policy: The window policy for wipe behavior (uses defaults if not provided).
+        """
+        self.strategy = strategy
+        self.compactor = compactor
+        self.policy = policy
+
+    async def maybe_compact(self, conv: Conversation) -> Conversation:
+        """Check if compaction is needed and compact if threshold is met.
+
+        Uses the configured strategy to determine if compaction is needed.
+        If triggered, summarizes old messages and applies the wipe mode.
+
+        Args:
+            conv: The conversation to potentially compact.
+
+        Returns:
+            The conversation after compaction (if applicable).
+        """
+        if not self.strategy.should_compact(conv):
+            return conv
+
+        # Get messages to summarize according to strategy
+        messages_to_summarize = self.strategy.get_messages_to_summarize(conv)
+        if not messages_to_summarize:
+            return conv
+
+        # Summarize old messages
+        summary_text = await self.compactor.asummarize(messages_to_summarize)
+        summary = Summary(
+            text=summary_text,
+            span_start=0,
+            span_end=len(messages_to_summarize) - 1,
+        )
+        conv.summaries.append(summary)
+
+        # Apply wipe mode
+        if self.policy.wipe_mode == WipeMode.WIPE:
+            keep_n = self.policy.keep_n_recent
+            conv.messages = conv.messages[-keep_n:]
+
+        return conv
+
+
 class AbstractBackend(ABC):
     """Abstract base class for conversation persistence backends.
 
@@ -26,8 +87,13 @@ class AbstractBackend(ABC):
     - get_summaries/aget_summaries: fetch summaries for a conversation
     """
 
-    def __init__(self, conversation_id: int | None = None, compact_engine) -> None:
+    def __init__(
+        self,
+        compact_engine: CompactionEngine,
+        conversation_id: int | None = None,
+    ) -> None:
         """Initialize the backend."""
+        self.compact_engine = compact_engine
         self.conversation_id = conversation_id
 
     # --- Conversation lifecycle ---
@@ -94,6 +160,9 @@ class AbstractBackend(ABC):
     def add_message(self, message: Message, conversation_id: int | None = None) -> Message:
         """Add a message to a conversation, assigns message.id (sync).
 
+        After implementation, backends should call _maybe_compact_sync() to trigger
+        compaction if the conversation exceeds the compaction threshold.
+
         Returns:
             The message with its assigned id.
         """
@@ -102,8 +171,35 @@ class AbstractBackend(ABC):
     async def aadd_message(self, message: Message, conversation_id: int | None = None) -> Message:
         """Add a message to a conversation, assigns message.id (async).
 
+        After implementation, backends should call _maybe_compact_async() to trigger
+        compaction if the conversation exceeds the compaction threshold.
+
         Returns:
             The message with its assigned id.
+        """
+    
+    @abstractmethod
+    def _maybe_compact_sync(self, conversation_id: int | None = None) -> None:
+        """Check and compact the conversation after a message is added (sync helper).
+
+        This is a helper method that backends should call after add_message.
+        Loads the conversation, applies compaction if needed, then saves it.
+        Marks messages that were summarized with is_summarized=True.
+
+        Args:
+            conversation_id: The conversation to compact (uses self.conversation_id if None).
+        """
+        
+    @abstractmethod
+    async def _maybe_compact_async(self, conversation_id: int | None = None) -> None:
+        """Check and compact the conversation after a message is added (async helper).
+
+        This is a helper method that backends should call after aadd_message.
+        Loads the conversation, applies compaction if needed, then saves it.
+        Marks messages that were summarized with is_summarized=True.
+
+        Args:
+            conversation_id: The conversation to compact (uses self.conversation_id if None).
         """
 
     @abstractmethod
@@ -141,76 +237,13 @@ class AbstractBackend(ABC):
         """Return all summaries for a conversation ordered by insertion (async)."""
 
 
-
-
-
-class CompactionEngine:
-    """Engine for compacting conversations using a configurable strategy.
-
-    Takes a CompactionStrategy and an AbstractCompactor to manage conversation
-    history according to the selected strategy (token-based, message-count, etc).
-    """
-
-    def __init__(
-        self,
-        strategy: AbstractCompactionStrategy,
-        compactor: AbstractCompactor,
-        policy: CompactionPolicy,
-    ) -> None:
-        """Initialize the compaction engine.
-
-        Args:
-            strategy: The compaction strategy that determines when to compact.
-            compactor: The compactor instance for summarizing messages.
-            policy: The window policy for wipe behavior (uses defaults if not provided).
-        """
-        self.strategy = strategy
-        self.compactor = compactor
-        self.policy = policy
-
-    async def maybe_compact(self, conv: Conversation) -> Conversation:
-        """Check if compaction is needed and compact if threshold is met.
-
-        Uses the configured strategy to determine if compaction is needed.
-        If triggered, summarizes old messages and applies the wipe mode.
-
-        Args:
-            conv: The conversation to potentially compact.
-
-        Returns:
-            The conversation after compaction (if applicable).
-        """
-        if not self.strategy.should_compact(conv):
-            return conv
-
-        # Get messages to summarize according to strategy
-        messages_to_summarize = self.strategy.get_messages_to_summarize(conv)
-        if not messages_to_summarize:
-            return conv
-
-        # Summarize old messages
-        summary_text = await self.compactor.asummarize(messages_to_summarize)
-        summary = Summary(
-            text=summary_text,
-            span_start=0,
-            span_end=len(messages_to_summarize) - 1,
-        )
-        conv.summaries.append(summary)
-
-        # Apply wipe mode
-        if self.policy.wipe_mode == WipeMode.WIPE:
-            keep_n = self.policy.keep_n_recent
-            conv.messages = conv.messages[-keep_n:]
-
-        return conv
-
-
 __all__ = [
     "Role",
     "WipeMode",
     "Message",
     "Summary",
     "Conversation",
+    "CompactionPolicy",
     "AbstractBackend",
     "AbstractCompactor",
     "AbstractCompactionStrategy",

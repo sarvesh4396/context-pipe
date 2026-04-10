@@ -35,8 +35,10 @@ class Message:
         role: The role of the message sender (user, assistant, or system).
         content: The text content of the message.
         token_count: The number of tokens in the message (default 0).
+        id: Unique identifier for the message (default None, assigned by backend).
         metadata: Additional metadata associated with the message (default empty dict).
         created_at: Timestamp when the message was created (default current time).
+        is_summarized: Whether this message has been included in a summary and may have been wiped (default False).
     """
 
     role: Role
@@ -45,6 +47,7 @@ class Message:
     id: int | None = None
     metadata: dict[str, object] = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.now)
+    is_summarized: bool = False
 
 
 @dataclass

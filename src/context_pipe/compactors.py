@@ -118,7 +118,7 @@ class OpenAICompactor:
             temperature=0.3,
         )
 
-        return response.choices[0].message.content.strip() or "Unable to generate summary"
+        return (response.choices[0].message.content or "" ).strip() or "Unable to generate summary"
 
     async def asummarize(self, messages: list[Message]) -> str:
         """Summarize a list of messages using OpenAI API (async).
@@ -146,7 +146,7 @@ class OpenAICompactor:
             temperature=0.3,
         )
 
-        return response.choices[0].message.content.strip() or "Unable to generate summary"
+        return (response.choices[0].message.content or "" ).strip() or "Unable to generate summary"
 
 
 class SimpleCompactor:
