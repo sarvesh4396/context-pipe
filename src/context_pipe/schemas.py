@@ -101,3 +101,4 @@ class CompactionPolicy:
     token_budget: int = 4096
     trigger_at: float = 0.85
     keep_n_recent: int = 10
+    wipe_mode: WipeMode = WipeMode.KEEP
