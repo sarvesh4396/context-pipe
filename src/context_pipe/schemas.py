@@ -87,3 +87,17 @@ class Conversation:
             The sum of token counts across all messages.
         """
         return sum(msg.token_count for msg in self.messages)
+
+
+@dataclass
+class CompactionPolicy:
+    """Defines the policy for compacting messages in a conversation.
+
+    Attributes:
+        strategy: The strategy to determine when to compact messages.
+        wipe_mode: How to handle messages that are compacted (default WIPE).
+    """
+
+    token_budget: int = 4096
+    trigger_at: float = 0.85
+    keep_n_recent: int = 10
